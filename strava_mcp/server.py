@@ -49,9 +49,10 @@ def list_activities(
         after: Only return activities after this date (ISO 8601, e.g. "2025-01-01").
         before: Only return activities before this date (ISO 8601, e.g. "2025-12-31").
     """
+    limit = max(1, min(limit, 200))
     client = StravaClient()
     activities = client.list_activities(
-        per_page=min(limit, 200),
+        per_page=limit,
         after=_iso_to_ts(after) if after else None,
         before=_iso_to_ts(before) if before else None,
     )

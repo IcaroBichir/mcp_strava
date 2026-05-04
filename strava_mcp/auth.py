@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -10,8 +11,8 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 
-# Load .env from the project root if present (no extra deps needed)
-_ENV_FILE = Path(__file__).parent.parent / ".env"
+# Load .env from the current working directory if present (no extra deps needed)
+_ENV_FILE = Path.cwd() / ".env"
 if _ENV_FILE.exists():
     for _line in _ENV_FILE.read_text().splitlines():
         _line = _line.strip()
@@ -31,9 +32,17 @@ _SCOPES = "activity:read_all,profile:read_all"
 
 class _CallbackHandler(BaseHTTPRequestHandler):
     auth_code: str | None = None
+    expected_state: str | None = None
 
     def do_GET(self) -> None:
         params = parse_qs(urlparse(self.path).query)
+        state = params.get("state", [None])[0]
+        if state != _CallbackHandler.expected_state:
+            self.send_response(400)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(b"<h1>Authorization failed: invalid state parameter.</h1>")
+            return
         _CallbackHandler.auth_code = params.get("code", [None])[0]
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
@@ -54,18 +63,22 @@ def get_client_credentials() -> tuple[str, str]:
     if not client_id or not client_secret:
         raise RuntimeError(
             "STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET must be set.\n"
-            "Add them to a .env file in the project root or export them as environment variables."
+            "Add them to a .env file in the working directory or export them as environment variables."
         )
     return client_id, client_secret
 
 
 def run_oauth_flow(client_id: str, client_secret: str) -> dict:
+    state = secrets.token_urlsafe(16)
+    _CallbackHandler.expected_state = state
+
     query = urlencode({
         "client_id": client_id,
         "response_type": "code",
         "redirect_uri": _REDIRECT_URI,
         "scope": _SCOPES,
         "approval_prompt": "auto",
+        "state": state,
     })
     auth_url = f"{_AUTH_URL}?{query}"
 
@@ -87,7 +100,7 @@ def run_oauth_flow(client_id: str, client_secret: str) -> dict:
         "client_secret": client_secret,
         "code": code,
         "grant_type": "authorization_code",
-    })
+    }, timeout=15)
     resp.raise_for_status()
     token_data = resp.json()
     _save(client_id, client_secret, token_data)
@@ -126,7 +139,7 @@ def refresh_if_needed() -> dict:
         "client_secret": tokens["client_secret"],
         "refresh_token": tokens["refresh_token"],
         "grant_type": "refresh_token",
-    })
+    }, timeout=15)
     resp.raise_for_status()
     new_data = resp.json()
     _save(tokens["client_id"], tokens["client_secret"], new_data)
