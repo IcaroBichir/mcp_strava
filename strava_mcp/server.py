@@ -25,10 +25,14 @@ _SUMMARY_KEYS = {
 }
 
 
-def _iso_to_ts(date_str: str) -> int:
+def _iso_to_ts(date_str: str, end_of_day: bool = False) -> int:
     dt = datetime.fromisoformat(date_str)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
+    # Date-only strings (no time component) default to midnight; for `before` filters
+    # that excludes the entire end date, so shift to 23:59:59 when requested.
+    if end_of_day and dt.hour == 0 and dt.minute == 0 and dt.second == 0:
+        dt = dt.replace(hour=23, minute=59, second=59)
     return int(dt.timestamp())
 
 
@@ -51,10 +55,14 @@ def list_activities(
     """
     limit = max(1, min(limit, 200))
     client = StravaClient()
+    # When filtering by sport_type, fetch the maximum page size so the client-side
+    # filter doesn't cause under-delivery (e.g. requesting 30 Runs but getting fewer
+    # because the newest 30 activities include other sports).
+    per_page = 200 if sport_type else limit
     activities = client.list_activities(
-        per_page=limit,
+        per_page=per_page,
         after=_iso_to_ts(after) if after else None,
-        before=_iso_to_ts(before) if before else None,
+        before=_iso_to_ts(before, end_of_day=True) if before else None,
     )
     if sport_type:
         activities = [a for a in activities if a.get("sport_type") == sport_type]

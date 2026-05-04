@@ -53,18 +53,14 @@ pip install -e .
 
 ### 3. Authenticate
 
-```bash
-strava-mcp auth
-```
-
-Before running, make sure your credentials are available — either exported as environment variables:
+First, make your credentials available — either exported as environment variables:
 
 ```bash
 export STRAVA_CLIENT_ID=your_client_id
 export STRAVA_CLIENT_SECRET=your_client_secret
 ```
 
-Or saved in a `.env` file in the project root:
+Or saved in a `.env` file in your **current working directory** (wherever you run `strava-mcp auth` from):
 
 ```
 STRAVA_CLIENT_ID=your_client_id

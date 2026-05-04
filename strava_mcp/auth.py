@@ -86,13 +86,17 @@ def run_oauth_flow(client_id: str, client_secret: str) -> dict:
     print(f"If the browser does not open, visit:\n  {auth_url}")
     webbrowser.open(auth_url)
 
-    print(f"Waiting for callback on http://localhost:{_REDIRECT_PORT}...")
+    print(f"Waiting for callback on http://localhost:{_REDIRECT_PORT}... (times out in 2 minutes)")
     server = HTTPServer(("localhost", _REDIRECT_PORT), _CallbackHandler)
+    server.timeout = 120
     server.handle_request()
 
     code = _CallbackHandler.auth_code
     if not code:
-        raise RuntimeError("No authorization code received — was the request denied?")
+        raise RuntimeError(
+            "No authorization code received — did the browser open? "
+            "The flow times out after 2 minutes if no redirect is received."
+        )
 
     print("Exchanging authorization code for tokens...")
     resp = httpx.post(_TOKEN_URL, data={
