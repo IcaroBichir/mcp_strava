@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -8,6 +9,15 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
+
+# Load .env from the project root if present (no extra deps needed)
+_ENV_FILE = Path(__file__).parent.parent / ".env"
+if _ENV_FILE.exists():
+    for _line in _ENV_FILE.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
 
 CONFIG_DIR = Path.home() / ".config" / "strava-mcp"
 TOKENS_FILE = CONFIG_DIR / "tokens.json"
@@ -35,6 +45,18 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 
     def log_message(self, *args) -> None:
         pass  # suppress request logs
+
+
+def get_client_credentials() -> tuple[str, str]:
+    """Return (client_id, client_secret) from env vars or raise."""
+    client_id = os.environ.get("STRAVA_CLIENT_ID")
+    client_secret = os.environ.get("STRAVA_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        raise RuntimeError(
+            "STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET must be set.\n"
+            "Add them to a .env file in the project root or export them as environment variables."
+        )
+    return client_id, client_secret
 
 
 def run_oauth_flow(client_id: str, client_secret: str) -> dict:
