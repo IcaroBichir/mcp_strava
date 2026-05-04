@@ -121,8 +121,11 @@ def _save(client_id: str, client_secret: str, token_data: dict) -> None:
         "expires_at": token_data["expires_at"],
         "athlete_id": token_data.get("athlete", {}).get("id"),
     }
-    TOKENS_FILE.write_text(json.dumps(payload, indent=2))
-    TOKENS_FILE.chmod(0o600)
+    # Use os.open with O_CREAT and mode 0o600 so the file is never readable by
+    # other local users, even briefly between creation and a separate chmod call.
+    fd = os.open(TOKENS_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(json.dumps(payload, indent=2))
 
 
 def load_tokens() -> dict:

@@ -29,9 +29,9 @@ def _iso_to_ts(date_str: str, end_of_day: bool = False) -> int:
     dt = datetime.fromisoformat(date_str)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    # Date-only strings (no time component) default to midnight; for `before` filters
-    # that excludes the entire end date, so shift to 23:59:59 when requested.
-    if end_of_day and dt.hour == 0 and dt.minute == 0 and dt.second == 0:
+    # Only adjust to end-of-day for date-only strings (no 'T' separator).
+    # Checking the raw string avoids rewrites for explicit T00:00:00 datetimes.
+    if end_of_day and "T" not in date_str and " " not in date_str:
         dt = dt.replace(hour=23, minute=59, second=59)
     return int(dt.timestamp())
 
@@ -55,17 +55,31 @@ def list_activities(
     """
     limit = max(1, min(limit, 200))
     client = StravaClient()
-    # When filtering by sport_type, fetch the maximum page size so the client-side
-    # filter doesn't cause under-delivery (e.g. requesting 30 Runs but getting fewer
-    # because the newest 30 activities include other sports).
-    per_page = 200 if sport_type else limit
-    activities = client.list_activities(
-        per_page=per_page,
-        after=_iso_to_ts(after) if after else None,
-        before=_iso_to_ts(before, end_of_day=True) if before else None,
-    )
+    after_ts = _iso_to_ts(after) if after else None
+    before_ts = _iso_to_ts(before, end_of_day=True) if before else None
+
     if sport_type:
-        activities = [a for a in activities if a.get("sport_type") == sport_type]
+        # Paginate until we have enough matching activities or exhaust the API.
+        # A single page of 200 may not contain `limit` matching activities when
+        # the history is mixed across sport types.
+        matched: list[dict] = []
+        page = 1
+        while len(matched) < limit:
+            page_results = client.list_activities(
+                per_page=200, page=page, after=after_ts, before=before_ts,
+            )
+            if not page_results:
+                break
+            matched.extend(a for a in page_results if a.get("sport_type") == sport_type)
+            if len(page_results) < 200:
+                break  # reached the last page
+            page += 1
+        activities = matched
+    else:
+        activities = client.list_activities(
+            per_page=limit, after=after_ts, before=before_ts,
+        )
+
     return [{k: v for k, v in a.items() if k in _SUMMARY_KEYS and v is not None}
             for a in activities[:limit]]
 
