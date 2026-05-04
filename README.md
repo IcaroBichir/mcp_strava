@@ -57,6 +57,26 @@ pip install -e .
 strava-mcp auth
 ```
 
+Before running, make sure your credentials are available — either exported as environment variables:
+
+```bash
+export STRAVA_CLIENT_ID=your_client_id
+export STRAVA_CLIENT_SECRET=your_client_secret
+```
+
+Or saved in a `.env` file in the project root:
+
+```
+STRAVA_CLIENT_ID=your_client_id
+STRAVA_CLIENT_SECRET=your_client_secret
+```
+
+Then run:
+
+```bash
+strava-mcp auth
+```
+
 This opens your browser, completes the Strava OAuth flow, and stores tokens at `~/.config/strava-mcp/tokens.json`. Tokens are refreshed automatically — you only need to run this once.
 
 ### 4. Add to Claude
@@ -125,7 +145,7 @@ PRs are welcome. Some ideas for v0.2:
 - **Streams** — raw GPS, power, cadence time-series data for a given activity
 - **Clubs** — club feed and leaderboards
 - **Webhook support** — real-time activity sync
-- **Cached responses** — avoid hitting rate limits (200 req/15min) during analysis sessions
+- **Cached responses** — avoid hitting rate limits (100 req/15min) during analysis sessions
 
 Please open an issue before starting significant work so we can align on approach.
 
