@@ -38,5 +38,29 @@ def serve() -> None:
     mcp.run()
 
 
+@cli.group()
+def cache() -> None:
+    """Inspect or manage the local response cache."""
+
+
+@cache.command("stats")
+def cache_stats() -> None:
+    """Show cache entry count and file size."""
+    from .cache import CacheStore
+
+    s = CacheStore().stats()
+    click.echo(f"Entries:  {s['total_entries']} total, {s['expired_entries']} expired")
+    click.echo(f"Size:     {s['cache_size_bytes'] / 1024:.1f} KB")
+
+
+@cache.command("clear")
+def cache_clear() -> None:
+    """Delete all cached responses."""
+    from .cache import CacheStore
+
+    count = CacheStore().clear()
+    click.echo(f"Cleared {count} cache entries.")
+
+
 if __name__ == "__main__":
     cli()
