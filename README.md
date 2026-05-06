@@ -161,8 +161,9 @@ Once connected, try asking Claude:
 ## Tests
 
 ```bash
-pip install -e ".[dev]"   # installs pytest
-pytest tests/ -v
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"   # installs the package + pytest
+.venv/bin/pytest tests/ -v
 ```
 
 37 tests covering `CacheStore` TTL behaviour, `StravaClient._cached_get` hit/miss logic, and server-layer tool logic (`_iso_to_ts` edge cases, `list_activities` limit clamping, sport-type pagination, `_SUMMARY_KEYS` filtering). No network calls — auth and HTTP are mocked.
