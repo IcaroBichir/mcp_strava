@@ -11,7 +11,7 @@ _BASE = "https://www.strava.com/api/v3"
 _TTL_ACTIVITY = 7 * 24 * 3600   # 7d — activity data is immutable once synced
 _TTL_ATHLETE = 24 * 3600         # 24h — profile changes rarely
 _TTL_STATS = 3600                 # 1h  — updates after each new activity sync
-_TTL_LIST = 900                   # 15min — new activities come in periodically
+_TTL_LIST = 3600                  # 60min — new activities come in periodically
 _TTL_GEAR = 24 * 3600            # 24h — mileage counter updates occasionally
 
 
