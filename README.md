@@ -158,6 +158,17 @@ Once connected, try asking Claude:
 
 ---
 
+## Tests
+
+```bash
+pip install -e ".[dev]"   # installs pytest
+pytest tests/ -v
+```
+
+37 tests covering `CacheStore` TTL behaviour, `StravaClient._cached_get` hit/miss logic, and server-layer tool logic (`_iso_to_ts` edge cases, `list_activities` limit clamping, sport-type pagination, `_SUMMARY_KEYS` filtering). No network calls — auth and HTTP are mocked.
+
+---
+
 ## Contributing
 
 PRs are welcome. Some ideas for v0.2:
