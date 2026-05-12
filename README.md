@@ -107,6 +107,31 @@ Restart Claude after editing the config.
 
 ---
 
+## Local cache
+
+All API responses are cached locally in `~/.config/strava-mcp/cache.db` (SQLite) so repeated questions don't burn your rate limit (100 req/15 min).
+
+| Endpoint | TTL | Reason |
+|---|---|---|
+| `get_activity/{id}` | 7 days | Activity data is immutable once synced |
+| `get_athlete` | 24 hours | Profile changes rarely |
+| `get_gear/{id}` | 24 hours | Mileage counter trickles in slowly |
+| `get_athlete_stats` | 1 hour | Updates after each new activity sync |
+| `list_activities` | 1 hour | New activities come in periodically |
+
+Cache entries expire lazily — a stale row sits in the DB until that exact query is made again, at which point it's evicted and re-fetched.
+
+**Cache commands:**
+
+```bash
+strava-mcp cache stats   # show entry count and file size
+strava-mcp cache clear   # wipe all cached responses
+```
+
+If you just finished a workout and want to see it immediately, run `strava-mcp cache clear` to force a fresh fetch on the next query.
+
+---
+
 ## Available tools
 
 | Tool | Description |
@@ -133,6 +158,18 @@ Once connected, try asking Claude:
 
 ---
 
+## Tests
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"   # installs the package + pytest
+.venv/bin/pytest tests/ -v
+```
+
+37 tests covering `CacheStore` TTL behaviour, `StravaClient._cached_get` hit/miss logic, and server-layer tool logic (`_iso_to_ts` edge cases, `list_activities` limit clamping, sport-type pagination, `_SUMMARY_KEYS` filtering). No network calls — auth and HTTP are mocked.
+
+---
+
 ## Contributing
 
 PRs are welcome. Some ideas for v0.2:
@@ -141,7 +178,6 @@ PRs are welcome. Some ideas for v0.2:
 - **Streams** — raw GPS, power, cadence time-series data for a given activity
 - **Clubs** — club feed and leaderboards
 - **Webhook support** — real-time activity sync
-- **Cached responses** — avoid hitting rate limits (100 req/15min) during analysis sessions
 
 Please open an issue before starting significant work so we can align on approach.
 
