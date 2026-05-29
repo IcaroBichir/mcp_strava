@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, timedelta
 from typing import Optional
 
 from mcp.server.fastmcp import FastMCP
@@ -25,17 +25,6 @@ _SUMMARY_KEYS = {
 }
 
 
-def _iso_to_ts(date_str: str, end_of_day: bool = False) -> int:
-    dt = datetime.fromisoformat(date_str)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    # Only adjust to end-of-day for date-only strings (no 'T' separator).
-    # Checking the raw string avoids rewrites for explicit T00:00:00 datetimes.
-    if end_of_day and "T" not in date_str and " " not in date_str:
-        dt = dt.replace(hour=23, minute=59, second=59)
-    return int(dt.timestamp())
-
-
 @mcp.tool()
 def list_activities(
     limit: int = 30,
@@ -46,6 +35,10 @@ def list_activities(
     """
     List the athlete's activities with summary stats.
 
+    Results are served from a per-day local cache (15-day TTL for past days,
+    5-minute TTL for today). Only days missing from the cache trigger API calls,
+    so repeated or overlapping requests are cheap.
+
     Args:
         limit: Number of activities to return (1–200). Default 30.
         sport_type: Filter by sport, e.g. "Run", "Ride", "Swim", "Walk", "WeightTraining",
@@ -54,34 +47,24 @@ def list_activities(
         before: Only return activities before this date (ISO 8601, e.g. "2025-12-31").
     """
     limit = max(1, min(limit, 200))
+
+    end_date = date.fromisoformat(before[:10]) if before else date.today()
+    if after:
+        start_date = date.fromisoformat(after[:10])
+    else:
+        # No lower bound given: look back enough days to fill the limit with headroom.
+        start_date = end_date - timedelta(days=max(limit * 2, 60))
+
     client = StravaClient()
-    after_ts = _iso_to_ts(after) if after else None
-    before_ts = _iso_to_ts(before, end_of_day=True) if before else None
+    activities = client.list_activities_in_range(start_date, end_date)
 
     if sport_type:
-        # Paginate until we have enough matching activities or exhaust the API.
-        # A single page of 200 may not contain `limit` matching activities when
-        # the history is mixed across sport types.
-        matched: list[dict] = []
-        page = 1
-        while len(matched) < limit:
-            page_results = client.list_activities(
-                per_page=200, page=page, after=after_ts, before=before_ts,
-            )
-            if not page_results:
-                break
-            matched.extend(a for a in page_results if a.get("sport_type") == sport_type)
-            if len(page_results) < 200:
-                break  # reached the last page
-            page += 1
-        activities = matched
-    else:
-        activities = client.list_activities(
-            per_page=limit, after=after_ts, before=before_ts,
-        )
+        activities = [a for a in activities if a.get("sport_type") == sport_type]
 
-    return [{k: v for k, v in a.items() if k in _SUMMARY_KEYS and v is not None}
-            for a in activities[:limit]]
+    return [
+        {k: v for k, v in a.items() if k in _SUMMARY_KEYS and v is not None}
+        for a in activities[:limit]
+    ]
 
 
 @mcp.tool()
