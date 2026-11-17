@@ -13,16 +13,25 @@ mcp = FastMCP(
         "Use these tools to retrieve the authenticated user's Strava data. "
         "Distances are in meters, times in seconds, speeds in m/s. "
         "Always convert to human-readable units (km or miles, min/km or min/mile, "
-        "HH:MM:SS) when presenting results."
+        "HH:MM:SS) when presenting results. "
+        "Always use the id_str field (a string) when referring to or passing "
+        "activity/athlete IDs — numeric ids may exceed 64-bit-safe JSON range."
     ),
 )
 
 _SUMMARY_KEYS = {
-    "id", "name", "sport_type", "start_date_local",
+    "id", "id_str", "name", "sport_type", "start_date_local",
     "distance", "moving_time", "elapsed_time", "total_elevation_gain",
     "average_speed", "max_speed", "average_heartrate", "max_heartrate",
     "suffer_score", "kudos_count", "achievement_count", "pr_count", "gear_id",
 }
+
+
+def _with_id_str(obj: dict) -> dict:
+    """Ensure id_str is present (older cached payloads predate Strava adding it)."""
+    if obj.get("id") is not None and not obj.get("id_str"):
+        obj["id_str"] = str(obj["id"])
+    return obj
 
 
 @mcp.tool()
@@ -61,22 +70,21 @@ def list_activities(
     if sport_type:
         activities = [a for a in activities if a.get("sport_type") == sport_type]
 
-    return [
-        {k: v for k, v in a.items() if k in _SUMMARY_KEYS and v is not None}
-        for a in activities[:limit]
-    ]
+    return [_with_id_str({k: v for k, v in a.items() if k in _SUMMARY_KEYS and v is not None})
+            for a in activities[:limit]]
 
 
 @mcp.tool()
-def get_activity(activity_id: int) -> dict:
+def get_activity(activity_id: str) -> dict:
     """
     Get full details for a single activity, including splits, segment efforts,
     best efforts, and lap data.
 
     Args:
-        activity_id: The Strava activity ID (available from list_activities).
+        activity_id: The Strava activity ID as a string — pass the id_str field
+                     from list_activities (not the numeric id).
     """
-    return StravaClient().get_activity(activity_id)
+    return _with_id_str(StravaClient().get_activity(activity_id))
 
 
 @mcp.tool()
@@ -99,11 +107,11 @@ def get_athlete() -> dict:
     """
     athlete = StravaClient().get_athlete()
     keep = {
-        "id", "firstname", "lastname", "city", "state", "country",
+        "id", "id_str", "firstname", "lastname", "city", "state", "country",
         "sex", "weight", "follower_count", "friend_count",
         "measurement_preference", "ftp", "created_at",
     }
-    return {k: v for k, v in athlete.items() if k in keep and v is not None}
+    return _with_id_str({k: v for k, v in athlete.items() if k in keep and v is not None})
 
 
 @mcp.tool()

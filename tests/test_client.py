@@ -49,6 +49,21 @@ def client_no_athlete(tmp_path, monkeypatch):
 # _cached_get — cache hit / miss
 # ---------------------------------------------------------------------------
 
+class TestGetActivity64BitIds:
+    BIG = 9_123_456_789_012_345_678
+
+    def test_int_and_str_ids_share_cache_and_url(self, client):
+        payload = {"id": self.BIG, "id_str": str(self.BIG)}
+        with patch.object(client, "_get", return_value=payload) as mock_get:
+            client.get_activity(self.BIG)
+            client.get_activity(str(self.BIG))
+        mock_get.assert_called_once_with(f"/activities/{self.BIG}")
+
+    def test_non_numeric_id_rejected(self, client):
+        with pytest.raises(ValueError):
+            client.get_activity("123/../athlete")
+
+
 class TestCachedGet:
     def test_cold_cache_calls_http(self, client):
         fake_response = {"id": 1, "name": "Test Activity"}

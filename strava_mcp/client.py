@@ -155,7 +155,13 @@ class StravaClient:
 
     # ── Single activity ───────────────────────────────────────────────────────
 
-    def get_activity(self, activity_id: int) -> dict:
+    def get_activity(self, activity_id: int | str) -> dict:
+        # Strava IDs become 64-bit after 2027-06-01; Python ints are unbounded, but
+        # the ID may arrive as a string (id_str) from MCP clients. Normalise to a
+        # digit string so the cache key is identical either way.
+        activity_id = str(activity_id).strip()
+        if not activity_id.isdigit():
+            raise ValueError(f"Invalid Strava activity ID: {activity_id!r}")
         return self._cached_get(
             f"activity:{activity_id}",
             f"/activities/{activity_id}",

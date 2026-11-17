@@ -199,9 +199,22 @@ class TestSummaryKeysFiltering:
 
     def test_summary_keys_set_contents(self):
         expected = {
-            "id", "name", "sport_type", "start_date_local",
+            "id", "id_str", "name", "sport_type", "start_date_local",
             "distance", "moving_time", "elapsed_time", "total_elevation_gain",
             "average_speed", "max_speed", "average_heartrate", "max_heartrate",
             "suffer_score", "kudos_count", "achievement_count", "pr_count", "gear_id",
         }
         assert _SUMMARY_KEYS == expected
+
+    def test_id_str_passed_through_for_64bit_id(self, mock_client):
+        big = 9_123_456_789_012_345_678  # > 2**53, not JS-safe
+        mock_client.list_activities_in_range.return_value = [
+            {"id": big, "id_str": str(big), "name": "Run", "sport_type": "Run"}
+        ]
+        assert list_activities(limit=1)[0]["id_str"] == "9123456789012345678"
+
+    def test_id_str_synthesised_when_missing(self, mock_client):
+        mock_client.list_activities_in_range.return_value = [
+            {"id": 12345, "name": "Run", "sport_type": "Run"}
+        ]
+        assert list_activities(limit=1)[0]["id_str"] == "12345"
