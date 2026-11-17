@@ -18,7 +18,11 @@ if _ENV_FILE.exists():
         _line = _line.strip()
         if _line and not _line.startswith("#") and "=" in _line:
             _k, _v = _line.split("=", 1)
-            os.environ.setdefault(_k.strip(), _v.strip())
+            # Only accept this server's own keys: the .env is read from whatever
+            # directory the server was launched in, and arbitrary vars there
+            # (HTTPS_PROXY, SSL_CERT_FILE, ...) could redirect API traffic.
+            if _k.strip().startswith("STRAVA_"):
+                os.environ.setdefault(_k.strip(), _v.strip())
 
 CONFIG_DIR = Path.home() / ".config" / "strava-mcp"
 TOKENS_FILE = CONFIG_DIR / "tokens.json"

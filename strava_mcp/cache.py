@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 from pathlib import Path
@@ -10,9 +11,18 @@ from .auth import CONFIG_DIR
 _CACHE_PATH = CONFIG_DIR / "cache.db"
 
 
+def _secure_path(db_path: Path) -> None:
+    """Keep the config dir and cache DB private — the cache holds health data
+    (and, for some servers, bearer tokens)."""
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(db_path.parent, 0o700)
+    os.close(os.open(db_path, os.O_CREAT | os.O_WRONLY, 0o600))
+    os.chmod(db_path, 0o600)
+
+
 class CacheStore:
     def __init__(self) -> None:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        _secure_path(_CACHE_PATH)
         self._conn = sqlite3.connect(_CACHE_PATH)
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS cache "
